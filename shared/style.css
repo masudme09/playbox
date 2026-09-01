@@ -1,0 +1,107 @@
+/* ============================================================
+   Playbox shared theme — portrait mobile game shell
+   Used identically by all five games.
+   ============================================================ */
+:root{
+  --bg:#080b14;
+  --bg-2:#0e1424;
+  --panel:rgba(18,26,44,.92);
+  --line:rgba(255,255,255,.10);
+  --txt:#e8edf7;
+  --txt-dim:#8b98b4;
+  --accent:#4ee1c1;
+  --accent-2:#7c5cff;
+  --warn:#ff6b6b;
+  --gold:#ffc857;
+  --ad-inset:0px;            /* raised by ads.js when a banner is on screen */
+  --safe-b:env(safe-area-inset-bottom,0px);
+  --safe-t:env(safe-area-inset-top,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;overscroll-behavior:none;touch-action:none}
+body{
+  background:var(--bg);
+  color:var(--txt);
+  font:400 16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  user-select:none;-webkit-user-select:none;
+  display:flex;flex-direction:column;
+  padding-top:var(--safe-t);
+  padding-bottom:calc(var(--safe-b) + var(--ad-inset));
+  transition:padding-bottom .18s ease;
+}
+canvas{display:block;width:100%;flex:1 1 auto;min-height:0;touch-action:none}
+
+/* ---------- overlay screens (menu / pause / game over) ---------- */
+.screen{
+  position:fixed;inset:0;z-index:20;
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  gap:18px;padding:28px 24px;
+  padding-bottom:calc(28px + var(--safe-b) + var(--ad-inset));
+  background:radial-gradient(120% 80% at 50% 0%,var(--bg-2) 0%,var(--bg) 70%);
+  text-align:center;
+}
+.screen.on{display:flex;animation:fade .22s ease}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.screen h1{
+  font-size:clamp(30px,10vw,48px);font-weight:800;letter-spacing:.14em;
+  text-transform:uppercase;
+  background:linear-gradient(180deg,#fff,var(--accent));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.screen h2{font-size:clamp(20px,6vw,28px);font-weight:700;letter-spacing:.04em}
+.screen p{color:var(--txt-dim);max-width:32ch;font-size:15px}
+
+/* ---------- buttons ---------- */
+.btn{
+  appearance:none;border:0;cursor:pointer;font:inherit;font-weight:700;
+  letter-spacing:.05em;text-transform:uppercase;font-size:15px;
+  padding:15px 30px;border-radius:14px;min-width:210px;min-height:52px;
+  color:#04121a;background:linear-gradient(180deg,var(--accent),#2fbca0);
+  box-shadow:0 6px 0 rgba(0,0,0,.35),0 10px 26px rgba(78,225,193,.22);
+  transition:transform .07s ease,box-shadow .07s ease;
+}
+.btn:active{transform:translateY(3px);box-shadow:0 3px 0 rgba(0,0,0,.35)}
+.btn.ghost{
+  background:transparent;color:var(--txt);
+  border:1px solid var(--line);box-shadow:none;
+}
+.btn.ghost:active{transform:translateY(2px);background:rgba(255,255,255,.05)}
+.btn.reward{
+  background:linear-gradient(180deg,var(--gold),#e0a52f);color:#241a02;
+  box-shadow:0 6px 0 rgba(0,0,0,.35),0 10px 26px rgba(255,200,87,.22);
+}
+.btn[disabled]{opacity:.4;pointer-events:none}
+.btn .sub{display:block;font-size:11px;font-weight:600;opacity:.75;letter-spacing:.06em}
+
+/* ---------- HUD ---------- */
+.hud{
+  position:relative;z-index:5;flex:0 0 auto;
+  display:flex;align-items:center;justify-content:space-between;
+  gap:10px;padding:10px 14px;font-variant-numeric:tabular-nums;
+}
+.hud .stat{display:flex;flex-direction:column;line-height:1.1}
+.hud .stat b{font-size:20px;font-weight:800}
+.hud .stat span{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--txt-dim)}
+.icon-btn{
+  appearance:none;border:1px solid var(--line);background:rgba(255,255,255,.04);
+  color:var(--txt);width:40px;height:40px;border-radius:11px;font-size:17px;cursor:pointer;
+  display:grid;place-items:center;
+}
+.icon-btn:active{background:rgba(255,255,255,.12)}
+
+/* ---------- misc ---------- */
+.chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.chip{
+  border:1px solid var(--line);border-radius:999px;padding:6px 13px;
+  font-size:12px;color:var(--txt-dim);letter-spacing:.05em;
+}
+.toast{
+  position:fixed;left:50%;transform:translateX(-50%);
+  bottom:calc(84px + var(--safe-b) + var(--ad-inset));
+  z-index:40;background:var(--panel);border:1px solid var(--line);
+  padding:11px 18px;border-radius:12px;font-size:14px;
+  opacity:0;pointer-events:none;transition:opacity .2s ease;
+  backdrop-filter:blur(8px);max-width:88vw;text-align:center;
+}
+.toast.on{opacity:1}
+.row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}

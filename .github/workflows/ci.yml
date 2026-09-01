@@ -1,0 +1,78 @@
+# =============================================================
+#  Tests. Runs on every push and every pull request.
+#  Nothing here needs a secret, so it works from the first commit.
+# =============================================================
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A new push to the same branch cancels the previous run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test suites
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Playwright's browser is ~150MB; cache it against the pinned version
+      # so most runs skip the download entirely.
+      - name: Cache Chromium
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Chromium
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Install Chromium system deps
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      # Assembles build/www and the Capacitor Android project. This also means
+      # a broken build script fails CI rather than surfacing at release time.
+      - name: Assemble the app
+        run: npm run build:android
+
+      - name: Release notes exist for this version
+        run: npm run notes
+
+      - name: All suites
+        run: npm test
+
+      # Screenshots and the hub's own shots are the fastest way to see what a
+      # failure actually looked like.
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostics-${{ github.run_number }}
+          path: |
+            /tmp/playbox-hub-shots/
+            store-assets/playbox/screenshots/
+            build/www/
+          retention-days: 7
+          if-no-files-found: ignore

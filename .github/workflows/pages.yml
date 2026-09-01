@@ -1,0 +1,84 @@
+# =============================================================
+#  Publishes two things you actually need:
+#    /privacy.html   the policy URL Play requires for an ad-funded
+#                    app, and that AdMob wants in its app settings
+#    /play/          the whole app, playable in a browser — handy
+#                    for recruiting the 12 closed testers, and for
+#                    checking a build from a phone without installing
+#
+#  One-time setup: repo Settings -> Pages -> Source: GitHub Actions.
+# =============================================================
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'legal/**'
+      - 'demo/**'
+      - 'app.config.json'
+      - 'shared/registry.js'
+      - 'tools/build-pages.mjs'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    name: Build the site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # Rebuild both inputs so the published policy and the published build can
+      # never drift from what is in the repo.
+      - name: Regenerate the policy and the playable build
+        run: |
+          npm run privacy
+          npm run demo
+
+      - name: Build the site
+        run: node tools/build-pages.mjs
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+      - name: The URLs you need
+        run: |
+          {
+            echo "### Published"
+            echo ""
+            echo "| What | URL |"
+            echo "| --- | --- |"
+            echo "| Privacy policy — paste this into Play Console and AdMob | ${{ steps.deploy.outputs.page_url }}privacy.html |"
+            echo "| Playable build | ${{ steps.deploy.outputs.page_url }}play/ |"
+          } >> "$GITHUB_STEP_SUMMARY"

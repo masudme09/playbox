@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no,maximum-scale=1">
+<meta name="theme-color" content="#080b14">
+<title>Playbox</title>
+<!-- stops the browser asking for a favicon that a WebView app has no use for -->
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="shared/style.css">
+<style>
+/* ============================================================
+   Hub-only CSS. Tokens, .btn, .screen and .toast come from
+   shared/style.css and are not redefined here.
+   ============================================================ */
+
+/* the shared sheet stretches every canvas to fill its flex parent;
+   hub emblems are fixed-size chips, so opt them out explicitly. */
+canvas.em{display:block;flex:0 0 auto;width:auto;height:auto;min-height:0}
+
+body{overflow:hidden}
+/* the shared sheet's display rules are more specific than the UA [hidden]
+   rule, so make the attribute win everywhere in the hub */
+[hidden]{display:none!important}
+
+/* ---------------- header ---------------- */
+.top{
+  flex:0 0 auto;display:flex;align-items:center;gap:5px;
+  padding:7px 10px;min-height:62px;
+  border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg,rgba(20,28,48,.75),rgba(8,11,20,0));
+}
+.mark{
+  flex:0 1 auto;min-width:0;font-size:13px;font-weight:800;letter-spacing:.13em;
+  background:linear-gradient(180deg,#fff,var(--accent));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  white-space:nowrap;overflow:hidden;
+}
+.top .spacer{flex:1 1 auto}
+.pill{
+  flex:0 0 auto;display:flex;align-items:center;gap:5px;
+  border:1px solid var(--line);border-radius:999px;padding:5px 8px;
+  font-size:12.5px;font-weight:800;font-variant-numeric:tabular-nums;
+  background:rgba(255,255,255,.04);line-height:1;
+}
+.pill.tok{color:var(--gold)}
+.pill.stk{color:#ff9d5c}
+.pill svg{width:13px;height:13px;flex:0 0 auto}
+/* 48px tap targets, as the contract requires — even on a 360px phone */
+.top .icon-btn{width:48px;height:48px;border-radius:13px;flex:0 0 auto}
+.top .icon-btn svg{width:20px;height:20px}
+.top .icon-btn[aria-current="true"]{border-color:rgba(78,225,193,.55);color:var(--accent)}
+.crumb{
+  display:none;flex:1 1 auto;min-width:0;font-size:16px;font-weight:700;
+  letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+body[data-view="shelf"] .crumb{display:none}
+body:not([data-view="shelf"]) .crumb{display:block}
+body:not([data-view="shelf"]) .mark,
+body:not([data-view="shelf"]) .navset{display:none}
+body[data-view="shelf"] #back{display:none}
+.navset{display:flex;gap:4px;flex:0 0 auto;margin-left:2px}
+
+/* ---------------- scroller + views ---------------- */
+.scroll{
+  flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;
+  touch-action:pan-y;-webkit-overflow-scrolling:touch;
+  padding:12px 12px calc(28px + var(--safe-b) + var(--ad-inset));
+}
+.view{display:none;flex-direction:column;gap:12px}
+.view.on{display:flex;animation:fade .2s ease}
+.eyebrow{
+  font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--txt-dim);
+}
+.card{
+  background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:13px;
+}
+.sec-title{
+  display:flex;align-items:baseline;justify-content:space-between;gap:8px;
+  margin:4px 2px -2px;
+}
+.sec-title .eyebrow{color:var(--txt-dim)}
+.sec-title .hint{font-size:11px;color:var(--txt-dim)}
+
+/* ---------------- daily challenge ---------------- */
+.daily{
+  background:
+    radial-gradient(120% 130% at 8% 0%,rgba(124,92,255,.20) 0%,rgba(18,26,44,.94) 58%),
+    var(--panel);
+  border-color:rgba(124,92,255,.30);
+}
+.daily.done{
+  background:
+    radial-gradient(120% 130% at 8% 0%,rgba(255,200,87,.22) 0%,rgba(18,26,44,.94) 58%),
+    var(--panel);
+  border-color:rgba(255,200,87,.42);
+}
+.dhead{display:flex;align-items:flex-start;gap:10px}
+.dhead .t{flex:1 1 auto;min-width:0}
+.dtitle{font-size:17px;font-weight:800;letter-spacing:.01em;margin-top:2px}
+.dcount{
+  flex:0 0 auto;font-size:12px;font-weight:800;letter-spacing:.08em;
+  font-variant-numeric:tabular-nums;
+  border:1px solid var(--line);border-radius:999px;padding:5px 10px;
+  color:var(--txt-dim);background:rgba(255,255,255,.04);
+}
+.daily.done .dcount{color:var(--gold);border-color:rgba(255,200,87,.45)}
+.goals{display:flex;flex-direction:column;gap:7px;margin:11px 0 10px}
+.goal{
+  appearance:none;font:inherit;text-align:left;cursor:pointer;width:100%;
+  display:flex;align-items:center;gap:10px;min-height:50px;padding:8px 10px;
+  border:1px solid var(--line);border-radius:12px;color:var(--txt);
+  background:rgba(255,255,255,.035);
+  border-left:3px solid var(--c,var(--accent));
+  transition:background .12s ease,transform .07s ease;
+}
+.goal:active{transform:translateY(1px);background:rgba(255,255,255,.09)}
+.goal .gt{flex:1 1 auto;min-width:0;font-size:13.5px;line-height:1.35}
+.goal .gg{
+  display:block;font-size:10px;font-weight:800;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--c,var(--accent));margin-bottom:2px;
+}
+.goal .gp{
+  flex:0 0 auto;font-size:13px;font-weight:800;font-variant-numeric:tabular-nums;
+  color:var(--txt-dim);min-width:30px;text-align:right;
+}
+.goal.ok{background:rgba(78,225,193,.09);border-color:rgba(78,225,193,.28)}
+.goal.ok .gt{color:var(--txt-dim)}
+.goal.ok .gx{text-decoration:line-through;text-decoration-color:rgba(255,255,255,.28)}
+.tick{width:22px;height:22px;flex:0 0 auto;color:var(--accent)}
+.dfoot{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding-top:9px;border-top:1px solid var(--line);
+  font-size:11.5px;color:var(--txt-dim);
+}
+.dfoot b{color:var(--gold);font-weight:800}
+.dfoot .cd{font-variant-numeric:tabular-nums;white-space:nowrap;letter-spacing:.02em}
+.dcheer{
+  display:none;font-size:12.5px;color:var(--gold);font-weight:600;
+  margin:2px 0 -2px;letter-spacing:.01em;
+}
+.daily.done .dcheer{display:block}
+
+/* ---------------- game tiles ---------------- */
+.tiles{display:flex;flex-direction:column;gap:9px}
+.tile{
+  appearance:none;font:inherit;text-align:left;cursor:pointer;width:100%;
+  display:flex;align-items:center;gap:11px;min-height:76px;padding:10px;
+  border:1px solid var(--line);border-radius:15px;color:var(--txt);
+  background:linear-gradient(100deg,var(--tint,rgba(255,255,255,.05)),rgba(18,26,44,.92) 62%);
+  transition:transform .07s ease,border-color .12s ease;
+}
+.tile:active{transform:translateY(2px);border-color:var(--c)}
+.tile .em{width:54px;height:54px;border-radius:13px;border:1px solid rgba(255,255,255,.09)}
+.tile .info{flex:1 1 auto;min-width:0}
+.trow{display:flex;align-items:center;gap:7px}
+.tname{font-size:16.5px;font-weight:800;letter-spacing:.01em}
+.badge{
+  font-size:9px;font-weight:800;letter-spacing:.12em;padding:2px 6px;border-radius:5px;
+  background:var(--accent);color:#04121a;
+}
+.ttag{font-size:12.5px;color:var(--txt-dim);margin-top:1px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tmeta{display:flex;align-items:baseline;gap:8px;margin-top:5px}
+.tkind{
+  font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--c);white-space:nowrap;
+}
+.tstat{
+  flex:1 1 auto;min-width:0;text-align:right;font-size:11px;color:var(--txt-dim);
+  font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.tstat b{color:var(--txt);font-weight:800}
+
+/* ---------------- shop ---------------- */
+.balance{
+  display:flex;align-items:center;gap:12px;
+  background:
+    radial-gradient(120% 130% at 100% 0%,rgba(255,200,87,.18) 0%,rgba(18,26,44,.94) 60%),
+    var(--panel);
+  border-color:rgba(255,200,87,.32);
+}
+.balance .big{
+  font-size:34px;font-weight:800;line-height:1;color:var(--gold);
+  font-variant-numeric:tabular-nums;
+}
+.balance .why{font-size:11.5px;color:var(--txt-dim);line-height:1.4}
+.group{margin-top:2px}
+.ghead{display:flex;align-items:center;gap:8px;margin:2px 2px 7px}
+.ghead .dot{width:8px;height:8px;border-radius:50%;background:var(--c);flex:0 0 auto}
+.ghead .n{font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}
+.srow{display:flex;align-items:center;gap:10px;padding:11px;border-radius:13px;
+  border:1px solid var(--line);background:rgba(255,255,255,.035)}
+.srow .info{flex:1 1 auto;min-width:0}
+.srow .lab{font-size:14.5px;font-weight:700}
+.srow .note{font-size:11.5px;color:var(--txt-dim);margin-top:2px}
+.srow .own{font-size:10px;font-weight:800;letter-spacing:.1em;color:var(--accent);margin-top:3px}
+.buy{
+  appearance:none;border:0;cursor:pointer;font:inherit;font-weight:800;
+  flex:0 0 auto;min-width:74px;min-height:48px;border-radius:12px;padding:0 12px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  color:#241a02;background:linear-gradient(180deg,var(--gold),#e0a52f);
+  box-shadow:0 4px 0 rgba(0,0,0,.35);
+}
+.buy:active{transform:translateY(2px);box-shadow:0 2px 0 rgba(0,0,0,.35)}
+.buy b{font-size:15px;font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:3px}
+.buy svg{width:12px;height:12px}
+.buy span{font-size:9px;letter-spacing:.12em;font-weight:800;opacity:.75}
+.buy[disabled]{opacity:.35;pointer-events:none}
+
+/* ---------------- stats ---------------- */
+.grid4{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.cell{
+  border:1px solid var(--line);border-radius:13px;padding:11px 12px;
+  background:rgba(255,255,255,.035);
+}
+.cell b{display:block;font-size:26px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
+.cell span{font-size:10px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--txt-dim)}
+.cell.gold b{color:var(--gold)}
+.cell.warm b{color:#ff9d5c}
+.grow{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:12px;
+  border:1px solid var(--line);background:rgba(255,255,255,.035)}
+.grow .em{width:34px;height:34px;border-radius:9px}
+.grow .n{flex:1 1 auto;min-width:0;font-size:14.5px;font-weight:700}
+.grow .v{text-align:right;flex:0 0 auto}
+.grow .v b{display:block;font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--c)}
+.grow .v span{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--txt-dim)}
+
+/* ---------------- settings ---------------- */
+.set{display:flex;flex-direction:column;gap:8px}
+.srow2{
+  display:flex;align-items:center;gap:12px;min-height:56px;padding:10px 12px;
+  border:1px solid var(--line);border-radius:13px;background:rgba(255,255,255,.035);
+  width:100%;font:inherit;color:var(--txt);text-align:left;appearance:none;cursor:pointer;
+}
+.srow2 .info{flex:1 1 auto;min-width:0}
+.srow2 .lab{font-size:15px;font-weight:700}
+.srow2 .note{font-size:11.5px;color:var(--txt-dim);margin-top:2px;line-height:1.35}
+.sw{
+  flex:0 0 auto;width:48px;height:28px;border-radius:999px;position:relative;
+  background:rgba(255,255,255,.10);border:1px solid var(--line);transition:background .15s ease;
+}
+.sw::after{
+  content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;
+  background:var(--txt-dim);transition:transform .15s ease,background .15s ease;
+}
+.srow2[aria-checked="true"] .sw{background:rgba(78,225,193,.30);border-color:rgba(78,225,193,.5)}
+.srow2[aria-checked="true"] .sw::after{transform:translateX(20px);background:var(--accent)}
+.srow2 .chev{width:18px;height:18px;flex:0 0 auto;color:var(--txt-dim)}
+.vers{text-align:center;font-size:11px;color:var(--txt-dim);padding:8px 0 2px;letter-spacing:.06em}
+
+/* ---------------- what's new ---------------- */
+.wn{
+  background:
+    radial-gradient(120% 120% at 50% 0%,rgba(78,225,193,.16) 0%,rgba(18,26,44,.94) 60%),
+    var(--panel);
+  border-color:rgba(78,225,193,.30);
+}
+.wn h2{font-size:22px;font-weight:800;letter-spacing:.02em;margin-top:3px}
+.notes{display:flex;flex-direction:column;gap:9px;margin:12px 0 0}
+.note-i{display:flex;gap:9px;font-size:13.5px;line-height:1.45;color:var(--txt)}
+.note-i i{
+  flex:0 0 auto;width:6px;height:6px;border-radius:50%;background:var(--accent);
+  margin-top:7px;font-style:normal;
+}
+.added{
+  margin-top:12px;padding-top:11px;border-top:1px solid var(--line);
+  font-size:12.5px;color:var(--txt-dim);
+}
+.added b{color:var(--accent)}
+.view .btn{align-self:center;min-width:min(100%,260px);margin-top:2px}
+
+/* ---------------- game frame ---------------- */
+.frame{
+  position:fixed;inset:0;z-index:30;display:none;flex-direction:column;
+  background:var(--bg);
+  padding-top:var(--safe-t);
+  padding-bottom:calc(var(--safe-b) + var(--ad-inset));
+}
+.frame.on{display:flex}
+.fbar{
+  flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:6px 10px;
+  min-height:46px;border-bottom:1px solid var(--line);background:rgba(8,11,20,.96);
+}
+.fbar .fn{flex:1 1 auto;min-width:0;font-size:14px;font-weight:800;letter-spacing:.09em;
+  text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fbar .fn i{display:inline-block;width:7px;height:7px;border-radius:50%;
+  background:var(--c,var(--accent));margin-right:7px;font-style:normal}
+.fexit{
+  appearance:none;border:1px solid var(--line);background:rgba(255,255,255,.05);
+  color:var(--txt);font:inherit;font-size:12px;font-weight:800;letter-spacing:.1em;
+  text-transform:uppercase;border-radius:10px;padding:0 13px;height:34px;min-width:74px;
+  display:flex;align-items:center;gap:6px;justify-content:center;cursor:pointer;
+}
+.fexit:active{background:rgba(255,255,255,.14)}
+.fexit svg{width:14px;height:14px}
+#gf{flex:1 1 auto;min-height:0;width:100%;border:0;display:block;background:var(--bg)}
+
+/* toast must clear the frame */
+.toast{z-index:60;bottom:calc(96px + var(--safe-b) + var(--ad-inset))}
+
+/* narrow phones: let the accent line and the headline stat share one row
+   without either being clipped */
+@media (max-width:380px){
+  .tkind{font-size:9px;letter-spacing:.08em}
+  .tstat{font-size:10.5px}
+  .tile .em{width:50px;height:50px}
+}
+@media (max-height:600px){
+  .dtitle{font-size:15px}
+  .tile{min-height:68px}
+}
+</style>
+</head>
+<body data-view="shelf">
+
+  <header class="top" id="top">
+    <button class="icon-btn" id="back" aria-label="Back">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+    </button>
+    <div class="mark">PLAYBOX</div>
+    <div class="crumb" id="crumb">Shop</div>
+    <div class="spacer"></div>
+    <div class="pill tok" id="tokPill" title="Tokens">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.6l3 4.4-3 4.4-3-4.4z" fill="currentColor" stroke="none"/></svg>
+      <b id="tokN">0</b>
+    </div>
+    <div class="pill stk" id="stkPill" title="Daily streak" hidden>
+      <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12.4 2.2c3.1 3.8 5.1 6.3 5.1 9.4a5.5 5.5 0 0 1-11 0c0-1.8.8-3.2 2-4.5.3 1.4 1 2.2 1.9 2.5-1.2-2.4-.6-4.9 2-7.4z"/></svg>
+      <b id="stkN">0</b>
+    </div>
+    <div class="navset">
+      <button class="icon-btn" id="navStats" aria-label="Stats">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M4 20V12M10 20V5M16 20v-6M21 20H3"/></svg>
+      </button>
+      <button class="icon-btn" id="navShop" aria-label="Shop">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.4 8.4h15.2l-1.35 11.4H5.75L4.4 8.4z"/><path d="M8.5 8.4V6.5a3.5 3.5 0 0 1 7 0v1.9"/></svg>
+      </button>
+      <button class="icon-btn" id="navSet" aria-label="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M3 7.5h11M18.5 7.5H21M3 16.5h4.5M12 16.5h9"/><circle cx="16.2" cy="7.5" r="2.3"/><circle cx="9.7" cy="16.5" r="2.3"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="scroll" id="scroll">
+
+    <!-- ---------------- shelf ---------------- -->
+    <section class="view on" id="v-shelf">
+      <div class="card daily" id="daily">
+        <div class="dhead">
+          <div class="t">
+            <div class="eyebrow">Daily challenge</div>
+            <div class="dtitle" id="dTitle">Three goals, three games</div>
+          </div>
+          <div class="dcount" id="dCount">0 / 3</div>
+        </div>
+        <div class="dcheer" id="dCheer"></div>
+        <div class="goals" id="goals"></div>
+        <div class="dfoot">
+          <div id="dPay"></div>
+          <div class="cd" id="dCd">&nbsp;</div>
+        </div>
+      </div>
+
+      <div class="sec-title">
+        <div class="eyebrow">Games</div>
+        <div class="hint" id="shelfHint"></div>
+      </div>
+      <div class="tiles" id="tiles"></div>
+    </section>
+
+    <!-- ---------------- shop ---------------- -->
+    <section class="view" id="v-shop">
+      <div class="card balance">
+        <div>
+          <div class="eyebrow">Balance</div>
+          <div class="big" id="shopTok">0</div>
+        </div>
+        <div class="why">Tokens come from the daily challenge — 3 for every goal you finish, 5 more for all three.</div>
+      </div>
+      <div id="shopList"></div>
+    </section>
+
+    <!-- ---------------- stats ---------------- -->
+    <section class="view" id="v-stats">
+      <div class="grid4">
+        <div class="cell gold"><b id="sTok">0</b><span>Tokens</span></div>
+        <div class="cell warm"><b id="sStreak">0</b><span>Day streak</span></div>
+        <div class="cell"><b id="sBest">0</b><span>Best streak</span></div>
+        <div class="cell"><b id="sPlays">0</b><span>Games opened</span></div>
+      </div>
+      <div class="sec-title"><div class="eyebrow">Per game</div></div>
+      <div class="tiles" id="statList"></div>
+    </section>
+
+    <!-- ---------------- settings ---------------- -->
+    <section class="view" id="v-settings">
+      <div class="set">
+        <button class="srow2" id="optSound" aria-checked="true">
+          <div class="info">
+            <div class="lab">Sound</div>
+            <div class="note">Effects in the hub and in every game.</div>
+          </div>
+          <div class="sw"></div>
+        </button>
+        <button class="srow2" id="optMotion" aria-checked="false">
+          <div class="info">
+            <div class="lab">Reduce motion</div>
+            <div class="note">Stops screen shake and rotation in Vortex — the only game that uses them.</div>
+          </div>
+          <div class="sw"></div>
+        </button>
+        <button class="srow2" id="optNew">
+          <div class="info">
+            <div class="lab">What's new</div>
+            <div class="note" id="optNewNote">Release notes for this version.</div>
+          </div>
+          <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <button class="srow2" id="optPrivacy" hidden>
+          <div class="info">
+            <div class="lab">Privacy options</div>
+            <div class="note">Review or change your ad-consent choices.</div>
+          </div>
+          <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+      <div class="vers" id="vers"></div>
+    </section>
+
+    <!-- ---------------- what's new ---------------- -->
+    <section class="view" id="v-new">
+      <div class="card wn">
+        <div class="eyebrow">What's new</div>
+        <h2 id="wnVer">Playbox 1.0.0</h2>
+        <div class="notes" id="wnNotes"></div>
+        <div class="added" id="wnAdded" hidden></div>
+      </div>
+      <button class="btn" id="wnOk">Let's play</button>
+    </section>
+
+  </main>
+
+  <!-- ---------------- game frame ---------------- -->
+  <div class="frame" id="frame">
+    <div class="fbar">
+      <div class="fn" id="fName"><i></i><span></span></div>
+      <button class="fexit" id="fBack">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+        Back
+      </button>
+    </div>
+    <iframe id="gf" title="Game" src="about:blank"></iframe>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>window.GAME_ID = 'playbox';</script>
+<script src="shared/ad-config.js"></script>
+<script src="shared/ads.js"></script>
+<script src="shared/engine.js"></script>
+<script src="shared/art.js"></script>
+<script src="shared/registry.js"></script>
+<script src="shared/profile.js"></script>
+<script src="hub/hub.js"></script>
+</body>
+</html>

@@ -1,0 +1,256 @@
+# =============================================================
+#  Build a signed bundle and push it to Google Play.
+#
+#    push to main   ->  internal test track (your own phone)
+#    tag v1.2.3     ->  production, as a DRAFT you press publish on
+#    manual run     ->  whichever track you pick
+#
+#  Every step degrades safely: with no signing secret it still
+#  builds and hands you an unsigned bundle as an artifact, and
+#  with no Play credentials it stops before uploading. So this
+#  file is useful from the first commit, before you have an
+#  account.
+#
+#  Secrets and variables it reads are documented in
+#  .github/RELEASING.md
+# =============================================================
+name: Release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      track:
+        description: 'Play track'
+        required: true
+        default: internal
+        type: choice
+        options: [internal, alpha, beta, production]
+      status:
+        description: 'Release status on that track'
+        required: true
+        default: draft
+        type: choice
+        options: [draft, completed, inProgress]
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false      # never interrupt an upload
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Build and ship
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ---------------------------------------------------------
+      #  Work out what we are doing before doing any of it
+      # ---------------------------------------------------------
+      - name: Decide the track
+        id: plan
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TRACK="${{ inputs.track }}"; STATUS="${{ inputs.status }}"
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            # Production is a draft on purpose: Play review takes days and a
+            # bad release is slow to undo, so a person presses the button.
+            TRACK=production; STATUS=draft
+          else
+            TRACK=internal; STATUS=completed
+          fi
+          echo "track=$TRACK"   >> "$GITHUB_OUTPUT"
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+          echo "### Releasing to \`$TRACK\` (\`$STATUS\`)" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Read the app version
+        id: ver
+        run: |
+          set -euo pipefail
+          VNAME=$(node -p "require('./app.config.json').versionName")
+          APPID=$(node -p "require('./app.config.json').appId")
+          # versionCode must strictly increase for every upload Play has ever
+          # seen. The run number does that without anyone remembering to.
+          OFFSET="${{ vars.VERSION_CODE_OFFSET || 100 }}"
+          VCODE=$(( ${{ github.run_number }} + OFFSET ))
+          echo "name=$VNAME"  >> "$GITHUB_OUTPUT"
+          echo "code=$VCODE"  >> "$GITHUB_OUTPUT"
+          echo "appid=$APPID" >> "$GITHUB_OUTPUT"
+          echo "- version \`$VNAME\` · versionCode \`$VCODE\` · \`$APPID\`" >> "$GITHUB_STEP_SUMMARY"
+
+      # A tag that disagrees with app.config.json means the in-app what's-new
+      # sheet and the store would show different versions. Stop here.
+      - name: Tag must match app.config.json
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME#v}"
+          if [ "$TAG" != "${{ steps.ver.outputs.name }}" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match versionName ${{ steps.ver.outputs.name }} in app.config.json"
+            exit 1
+          fi
+
+      # ---------------------------------------------------------
+      #  Never ship something that has not been tested
+      # ---------------------------------------------------------
+      - name: Cache Chromium
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Chromium
+        run: |
+          if [ "${{ steps.pw-cache.outputs.cache-hit }}" = "true" ]; then
+            npx playwright install-deps chromium
+          else
+            npx playwright install --with-deps chromium
+          fi
+
+      - name: Assemble the app
+        env:
+          PLAYBOX_VERSION_CODE: ${{ steps.ver.outputs.code }}
+          PLAYBOX_ADMOB_APP_ID: ${{ secrets.ADMOB_APP_ID }}
+          PLAYBOX_USE_TEST_ADS: ${{ secrets.AD_BANNER_ID && 'false' || 'true' }}
+          PLAYBOX_AD_BANNER: ${{ secrets.AD_BANNER_ID }}
+          PLAYBOX_AD_INTERSTITIAL: ${{ secrets.AD_INTERSTITIAL_ID }}
+          PLAYBOX_AD_REWARDED: ${{ secrets.AD_REWARDED_ID }}
+          PLAYBOX_AD_TEST_DEVICES: ${{ secrets.AD_TEST_DEVICE_IDS }}
+        run: npm run build:android
+
+      - name: All suites
+        run: npm test
+
+      - name: Release notes
+        run: npm run notes -- --write
+
+      # ---------------------------------------------------------
+      #  Android build
+      # ---------------------------------------------------------
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('tools/build-android.sh') }}-${{ github.run_number }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Signing key
+        id: sign
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEYSTORE_BASE64:-}" ]; then
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No ANDROID_KEYSTORE_BASE64 secret — building an UNSIGNED bundle. It cannot be uploaded to Play."
+            echo "- :warning: unsigned build (no signing secret configured)" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          for v in STORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!v:-}" ]; then echo "::error::ANDROID_KEYSTORE_BASE64 is set but $v is missing"; exit 1; fi
+          done
+          echo "$KEYSTORE_BASE64" | base64 -d > build/android/upload-keystore.jks
+          # sanity: a truncated or mis-pasted secret fails here, not at signing
+          keytool -list -keystore build/android/upload-keystore.jks \
+                  -storepass "$STORE_PASSWORD" >/dev/null
+          cat > build/android/keystore.properties <<EOF
+          storeFile=../upload-keystore.jks
+          storePassword=$STORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Build the app bundle
+        working-directory: build/android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon bundleRelease
+
+      - name: Find the bundle
+        id: aab
+        run: |
+          set -euo pipefail
+          AAB=$(find build/android/app/build/outputs/bundle -name '*.aab' | head -1)
+          if [ -z "$AAB" ]; then echo "::error::no .aab was produced"; exit 1; fi
+          SIZE=$(du -h "$AAB" | cut -f1)
+          echo "path=$AAB" >> "$GITHUB_OUTPUT"
+          echo "- bundle \`$(basename "$AAB")\` ($SIZE)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the bundle as a build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: playbox-${{ steps.ver.outputs.name }}-${{ steps.ver.outputs.code }}
+          path: ${{ steps.aab.outputs.path }}
+          retention-days: 90
+          if-no-files-found: error
+
+      # ---------------------------------------------------------
+      #  Play
+      # ---------------------------------------------------------
+      - name: Play credentials
+        id: play
+        env:
+          SA: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SA:-}" ] || [ "${{ steps.sign.outputs.signed }}" != "true" ]; then
+            echo "can_upload=false" >> "$GITHUB_OUTPUT"
+            echo "- :information_source: not uploaded — download the artifact above and upload it by hand, or add the missing secrets" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "$SA" | node -e 'JSON.parse(require("fs").readFileSync(0,"utf8"))' \
+              || { echo "::error::PLAY_SERVICE_ACCOUNT_JSON is not valid JSON"; exit 1; }
+            echo "can_upload=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload to Google Play
+        if: steps.play.outputs.can_upload == 'true'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: ${{ steps.ver.outputs.appid }}
+          releaseFiles: ${{ steps.aab.outputs.path }}
+          track: ${{ steps.plan.outputs.track }}
+          status: ${{ steps.plan.outputs.status }}
+          releaseName: ${{ steps.ver.outputs.name }} (${{ steps.ver.outputs.code }})
+          whatsNewDirectory: distribution/whatsnew
+          changesNotSentForReview: false
+          # No mappingFile: the release build does not run R8/minify, so there
+          # is no mapping to upload. Add it here if you ever turn minify on.
+
+      - name: Done
+        if: steps.play.outputs.can_upload == 'true'
+        run: |
+          echo "- :rocket: uploaded to **${{ steps.plan.outputs.track }}** as **${{ steps.plan.outputs.status }}**" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ steps.plan.outputs.track }}" = "production" ]; then
+            echo "- Open Play Console and press **Publish** when you are ready — it is sitting as a draft." >> "$GITHUB_STEP_SUMMARY"
+          fi

@@ -1,0 +1,27 @@
+{
+  "name": "playbox",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Playbox — one Android app, five original games, built to grow",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "bash tools/test-all.sh",
+    "test:ads": "node tools/test-ads.mjs",
+    "test:profile": "node tools/test-profile.mjs",
+    "test:hub": "node tools/test-hub.mjs",
+    "test:listings": "node tools/check-listings.mjs",
+    "verify": "node tools/verify.mjs",
+    "assets": "node tools/render-assets.mjs",
+    "screenshots": "node tools/screenshots.mjs",
+    "demo": "node tools/make-demo.mjs",
+    "privacy": "node tools/make-privacy.mjs",
+    "notes": "node tools/release-notes.mjs",
+    "new-game": "node tools/new-game.mjs",
+    "build:android": "bash tools/build-android.sh",
+    "postinstall:hint": "echo 'now run: npx playwright install --with-deps chromium'"
+  },
+  "devDependencies": {
+    "playwright": "1.49.1"
+  }
+}

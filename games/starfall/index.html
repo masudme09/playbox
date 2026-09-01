@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no,maximum-scale=1">
+<meta name="theme-color" content="#080b14">
+<title>Starfall</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../../shared/style.css">
+<style>
+  .hud{opacity:0;transition:opacity .25s ease;pointer-events:none}
+  .hud.on{opacity:1}
+  .hud .stat b{text-shadow:0 0 18px rgba(78,225,193,.45)}
+  .hud .stat.combo b{color:var(--gold);text-shadow:0 0 18px rgba(255,200,87,.5)}
+  .hud .stat.combo{align-items:flex-end;opacity:0;transition:opacity .18s ease}
+  .hud .stat.combo.on{opacity:1}
+  .tag{color:var(--txt-dim);letter-spacing:.22em;text-transform:uppercase;font-size:11px;margin-top:-8px}
+  .how{display:flex;flex-direction:column;gap:11px;margin-top:2px}
+  .how div{display:flex;align-items:center;gap:12px;font-size:13.5px;color:var(--txt-dim);letter-spacing:.02em}
+  .how i{flex:0 0 34px;height:34px;border-radius:11px;border:1px solid var(--line);
+         display:grid;place-items:center;font-style:normal;font-size:16px;background:rgba(255,255,255,.04)}
+  .how i.a{color:var(--accent)} .how i.b{color:var(--accent-2)} .how i.c{color:var(--gold)}
+  .big{font-size:clamp(44px,15vw,68px);font-weight:800;line-height:1;
+       font-variant-numeric:tabular-nums;
+       background:linear-gradient(180deg,#fff,var(--accent));
+       -webkit-background-clip:text;background-clip:text;color:transparent}
+  .unit{font-size:12px;letter-spacing:.24em;color:var(--txt-dim);text-transform:uppercase}
+  #record{display:none;color:var(--gold);font-weight:800;letter-spacing:.16em;
+          font-size:13px;text-transform:uppercase;animation:pop .5s ease}
+  #record.on{display:block}
+  @keyframes pop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.14)}100%{transform:scale(1);opacity:1}}
+  .mutebar{position:fixed;top:calc(10px + var(--safe-t));right:12px;z-index:30;width:48px;height:48px;font-size:20px}
+  #over h2{color:var(--warn);text-shadow:0 0 26px rgba(255,107,107,.35)}
+  /* let the live starfield read through the overlays */
+  #menu,#over,#pause{background:radial-gradient(120% 80% at 50% 0%,rgba(14,20,36,.84) 0%,rgba(8,11,20,.94) 68%)}
+</style>
+</head>
+<body>
+  <div class="hud" id="hud">
+    <div class="stat"><b id="alt">0</b><span>Altitude ly</span></div>
+    <div class="stat combo" id="combowrap"><b id="combo">x2</b><span>Assist chain</span></div>
+  </div>
+  <canvas id="cv"></canvas>
+
+  <div class="screen on" id="menu">
+    <h1>Starfall</h1>
+    <div class="tag">Slingshot through a dying galaxy</div>
+    <div class="chips">
+      <div class="chip">Best <b id="best">0</b> ly</div>
+      <div class="chip">Runs <b id="runs">0</b></div>
+    </div>
+    <button class="btn" id="play">Play</button>
+    <div class="how">
+      <div><i class="a">&#8592;</i><span>Drag back &amp; release to sling</span></div>
+      <div><i class="b">&#9673;</i><span>Curve past planets for assists</span></div>
+      <div><i class="c">&#10022;</i><span>Grab stardust to refuel</span></div>
+    </div>
+    <button class="icon-btn mutebar" id="mute" aria-label="Toggle sound">&#128266;</button>
+  </div>
+
+  <div class="screen" id="over">
+    <h2>Lost to the void</h2>
+    <div id="record">New record</div>
+    <div class="big" id="final">0</div>
+    <div class="unit">light years</div>
+    <p id="detail"></p>
+    <div class="chips"><div class="chip">Best <b id="best2">0</b> ly</div></div>
+    <button class="btn reward" id="cont" style="display:none">Watch ad
+      <span class="sub">Continue from here &middot; full fuel</span></button>
+    <button class="btn" id="retry">Retry</button>
+    <button class="btn ghost" id="home">Menu</button>
+  </div>
+
+  <div class="screen" id="pause">
+    <h2>Paused</h2>
+    <button class="btn" id="resume">Resume</button>
+    <button class="btn ghost" id="quit">Give up</button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>window.GAME_ID = 'starfall';</script>
+<script src="../../shared/ad-config.js"></script>
+<script src="../../shared/ads.js"></script>
+<!-- Points Ads at the host app when running inside Playbox; harmless standalone. -->
+<script src="../../shared/pb-child.js"></script>
+<script src="../../shared/engine.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

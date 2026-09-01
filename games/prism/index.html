@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no,maximum-scale=1">
+<meta name="theme-color" content="#080b14">
+<title>PRISM</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../../shared/style.css">
+<style>
+  body{background:#060912}
+  .hud{opacity:0;pointer-events:none;transition:opacity .18s ease;gap:6px;padding:8px 10px}
+  .hud.on{opacity:1;pointer-events:auto}
+  .hud .stat b{font-size:18px}
+  .icon-btn{width:48px;height:48px;border-radius:13px;font-size:19px;flex:0 0 auto}
+  #hintBtn{width:auto;min-width:52px;padding:0 11px;font-weight:800;font-size:15px;letter-spacing:.02em}
+  #hintBtn.hot{border-color:rgba(255,200,87,.55);color:var(--gold)}
+  .tag{letter-spacing:.24em;text-transform:uppercase;font-size:11px;color:var(--txt-dim);margin-top:-12px}
+  .spec{display:flex;gap:5px;justify-content:center;margin-top:-6px}
+  .spec i{width:16px;height:5px;border-radius:3px;display:block}
+  #levels{justify-content:flex-start;gap:14px;padding-top:calc(20px + var(--safe-t))}
+  .lvwrap{width:100%;max-width:400px;flex:1 1 auto;min-height:0;overflow-y:auto;
+          touch-action:pan-y;-webkit-overflow-scrolling:touch;padding:2px 3px 10px}
+  .lvgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:9px}
+  .lv{appearance:none;border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--txt);
+      font:inherit;font-weight:800;font-size:16px;border-radius:13px;height:60px;cursor:pointer;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+  .lv:active{background:rgba(255,255,255,.12)}
+  .lv[disabled]{opacity:.24;pointer-events:none}
+  .lv.done{border-color:rgba(78,225,193,.42);color:var(--accent)}
+  .lv .st{display:flex;gap:3px}
+  .lv .st i{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.16);display:block}
+  .lv .st i.on{background:var(--gold)}
+  .stars{display:flex;gap:16px;justify-content:center;min-height:40px;align-items:center}
+  .stars i{width:36px;height:36px;display:block;background:rgba(255,255,255,.13);
+    clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);
+    transform:scale(.4) rotate(-25deg);opacity:0;
+    transition:transform .34s cubic-bezier(.2,1.7,.4,1),opacity .24s ease}
+  .stars i.show{transform:scale(1) rotate(0);opacity:1}
+  .stars i.on{background:linear-gradient(180deg,#ffe9a8,var(--gold))}
+  .big{font-size:30px;font-weight:800;letter-spacing:.02em;font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+  <div class="hud" id="hud">
+    <button class="icon-btn" id="backBtn" aria-label="Menu">&#8249;</button>
+    <div class="stat"><b id="hudLv">1</b><span>Level</span></div>
+    <div class="stat"><b id="hudMv">0/1</b><span>Turns</span></div>
+    <button class="icon-btn" id="hintBtn" aria-label="Hint">? 3</button>
+    <button class="icon-btn" id="undoBtn" aria-label="Undo">&#8630;</button>
+    <button class="icon-btn" id="againBtn" aria-label="Restart">&#8635;</button>
+  </div>
+  <canvas id="cv"></canvas>
+
+  <div class="screen on" id="menu">
+    <h1>Prism</h1>
+    <p class="tag">Split the light</p>
+    <div class="spec"><i style="background:#ff4a66"></i><i style="background:#40f096"></i><i style="background:#6096ff"></i></div>
+    <p>White light enters. Bend it, break it, blend it &mdash; and feed every crystal at once.</p>
+    <button class="btn" id="btnPlay">Continue</button>
+    <button class="btn ghost" id="btnLevels">Levels</button>
+    <div class="chips">
+      <span class="chip" id="chipStars">0 / 135 stars</span>
+      <span class="chip" id="chipMute" role="button" tabindex="0">Sound on</span>
+    </div>
+  </div>
+
+  <div class="screen" id="levels">
+    <h2>Levels</h2>
+    <div class="lvwrap"><div class="lvgrid" id="lvGrid"></div></div>
+    <button class="btn ghost" id="btnLvBack">Back</button>
+  </div>
+
+  <div class="screen" id="clear">
+    <h2 id="clearTitle">Level 1 solved</h2>
+    <div class="stars" id="starRow"><i></i><i></i><i></i></div>
+    <div class="big" id="clearMoves">1 turn</div>
+    <p id="clearSub">Par 1</p>
+    <button class="btn" id="btnNext">Next</button>
+    <button class="btn ghost" id="btnClearMenu">Menu</button>
+  </div>
+
+  <div class="screen" id="nohints">
+    <h2>Out of hints</h2>
+    <p>A hint points at one piece that is facing the wrong way, and which way to turn it.</p>
+    <button class="btn reward" id="btnReward">Watch Ad<span class="sub">+3 hints</span></button>
+    <button class="btn ghost" id="btnHintClose">Not now</button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>window.GAME_ID = 'prism';</script>
+<script src="../../shared/ad-config.js"></script>
+<script src="../../shared/ads.js"></script>
+<!-- Points Ads at the host app when running inside Playbox; harmless standalone. -->
+<script src="../../shared/pb-child.js"></script>
+<script src="../../shared/engine.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no,maximum-scale=1">
+<meta name="theme-color" content="#080b14">
+<title>ECHO</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../../shared/style.css">
+<style>
+  body{background:#04060c}
+  .hud{opacity:0;pointer-events:none;transition:opacity .2s ease}
+  .hud.on{opacity:1;pointer-events:auto}
+  .pips{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;align-items:center;flex:1 1 auto;max-width:64%}
+  .pips i{width:7px;height:7px;border-radius:50%;background:var(--accent);
+          box-shadow:0 0 6px rgba(78,225,193,.7);display:block}
+  .pips.sm{gap:3px}
+  .pips.sm i{width:5px;height:5px;box-shadow:0 0 4px rgba(78,225,193,.7)}
+  .pips i.off{background:rgba(255,255,255,.13);box-shadow:none}
+  .tag{letter-spacing:.28em;text-transform:uppercase;font-size:11px;color:var(--txt-dim);margin-top:-10px}
+  .lvgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;width:100%;max-width:340px;
+          max-height:60vh;overflow-y:auto;padding:4px}
+  .lvgrid button{appearance:none;border:1px solid var(--line);background:rgba(255,255,255,.04);
+          color:var(--txt);height:52px;border-radius:12px;font:inherit;font-weight:700;font-size:15px;cursor:pointer}
+  .lvgrid button.done{border-color:rgba(78,225,193,.45);color:var(--accent)}
+  .lvgrid button[disabled]{opacity:.25;pointer-events:none}
+  .lvgrid button:active{background:rgba(255,255,255,.12)}
+  .big{font-size:30px;font-weight:800;letter-spacing:.02em;font-variant-numeric:tabular-nums}
+  .muted-note{font-size:12px;color:var(--txt-dim);letter-spacing:.08em}
+</style>
+</head>
+<body>
+  <div class="hud" id="hud">
+    <div class="stat"><b id="hudLv">1</b><span>Level</span></div>
+    <div class="pips" id="pips"></div>
+    <button class="icon-btn" id="pauseBtn" aria-label="Pause">&#10073;&#10073;</button>
+  </div>
+  <canvas id="cv"></canvas>
+
+  <div class="screen on" id="menu">
+    <h1>Echo</h1>
+    <p class="tag">See with sound</p>
+    <p>The maze is dark. Ping to see it — then remember.</p>
+    <button class="btn" id="btnPlay">Play</button>
+    <button class="btn ghost" id="btnLevels">Level Select</button>
+    <div class="chips">
+      <span class="chip" id="chipBest">Best level 1</span>
+      <span class="chip" id="chipMute" role="button" tabindex="0">Sound on</span>
+    </div>
+  </div>
+
+  <div class="screen" id="levels">
+    <h2>Select Level</h2>
+    <div class="lvgrid" id="lvGrid"></div>
+    <button class="btn ghost" id="btnLvBack">Back</button>
+  </div>
+
+  <div class="screen" id="pause">
+    <h2>Paused</h2>
+    <button class="btn" id="btnResume">Resume</button>
+    <button class="btn ghost" id="btnRestart">Restart Level</button>
+    <button class="btn ghost" id="btnQuit">Menu</button>
+  </div>
+
+  <div class="screen" id="clear">
+    <h2 id="clearTitle">Level 1 Clear</h2>
+    <div class="big" id="clearTime">0.0s</div>
+    <p id="clearBest">Best 0.0s</p>
+    <button class="btn" id="btnNext">Next</button>
+    <button class="btn ghost" id="btnClearMenu">Menu</button>
+  </div>
+
+  <div class="screen" id="fail">
+    <h2>Lost in the Dark</h2>
+    <p id="failMsg">Something found you first.</p>
+    <button class="btn" id="btnRetry">Retry</button>
+    <button class="btn reward" id="btnReward">Watch Ad<span class="sub">+4 pings on retry</span></button>
+    <button class="btn ghost" id="btnFailMenu">Menu</button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>window.GAME_ID = 'echo';</script>
+<script src="../../shared/ad-config.js"></script>
+<script src="../../shared/ads.js"></script>
+<!-- Points Ads at the host app when running inside Playbox; harmless standalone. -->
+<script src="../../shared/pb-child.js"></script>
+<script src="../../shared/engine.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "$comment": "The single Playbox app. The games inside it are declared in shared/registry.js, not here. Bump versionCode for EVERY upload; Play rejects a repeat.",
+  "appId": "com.yourstudio.playbox",
+  "appName": "Playbox",
+  "storeName": "Playbox: Mind & Reflex Games",
+  "versionName": "1.0.0",
+  "versionCode": 1,
+  "$admobComment": "Your AdMob APPLICATION id (note the ~, not a /). AdMob > Settings > App settings. The build writes this into res/values/strings.xml on every run, so it survives a rebuild \u2014 do NOT hand-edit strings.xml. The default below is Google's public test app id: safe, earns nothing.",
+  "admobAppId": "ca-app-pub-3940256099942544~3347511713",
+  "publisher": {
+    "developerName": "Your Studio",
+    "supportEmail": "you@example.com",
+    "privacyUrl": "https://yourdomain.example/privacy/playbox-privacy.html"
+  }
+}

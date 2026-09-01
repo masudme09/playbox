@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no,maximum-scale=1">
+<meta name="theme-color" content="#080b14">
+<title>Vortex</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../../shared/style.css">
+<style>
+  /* ---- game-specific only ---- */
+  .hud{opacity:0;transition:opacity .25s ease;pointer-events:none}
+  .hud.on{opacity:1}
+  .hud .stat.right{align-items:flex-end;text-align:right}
+  .hud .stat b#zoneName{font-size:12px;letter-spacing:.14em;font-weight:800;white-space:nowrap}
+  .hud .stat{flex:0 0 auto}
+
+  .pups{display:flex;gap:5px;align-items:center;min-height:24px;flex:0 1 auto;overflow:hidden}
+  .pup{
+    display:none;align-items:center;gap:4px;white-space:nowrap;
+    border:1px solid var(--line);border-radius:999px;
+    padding:3px 8px;font-size:9px;font-weight:800;line-height:1.4;
+    letter-spacing:.09em;text-transform:uppercase;
+    background:rgba(255,255,255,.04);
+  }
+  .pup.on{display:flex}
+  .pup i{width:6px;height:6px;border-radius:50%;font-style:normal;flex:0 0 auto}
+  .pup.slow{color:#7ee8ff}   .pup.slow i{background:#7ee8ff}
+  .pup.shield{color:var(--accent)} .pup.shield i{background:var(--accent)}
+  .pup.dbl{color:var(--gold)} .pup.dbl i{background:var(--gold)}
+
+  /* let the live vortex show through the menus — the attract loop is the
+     best screenshot the game has */
+  #menu,#over{
+    background:
+      radial-gradient(120% 70% at 50% 0%,rgba(14,20,36,.94) 0%,rgba(8,11,20,.78) 55%,rgba(8,11,20,.90) 100%);
+    backdrop-filter:blur(2px);
+  }
+  .tag{letter-spacing:.06em;color:var(--txt-dim);margin-top:-8px}
+  .how{
+    display:flex;flex-direction:column;gap:6px;
+    color:var(--txt-dim);font-size:13px;line-height:1.5;max-width:30ch;
+  }
+  .how b{color:var(--txt);font-weight:700}
+  .set{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+  .set .btn.ghost{min-width:0;padding:11px 16px;font-size:11px;min-height:48px}
+
+  .big{
+    font-size:clamp(52px,20vw,86px);font-weight:800;line-height:1;
+    font-variant-numeric:tabular-nums;
+    background:linear-gradient(180deg,#fff,var(--accent));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .cause{color:var(--warn);font-size:13px;letter-spacing:.03em;max-width:28ch}
+  .rec{display:none;color:var(--gold);font-weight:800;letter-spacing:.2em;font-size:13px}
+  .rec.on{display:block;animation:pop .5s ease}
+  @keyframes pop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
+  #revive{display:none}
+  #revive.on{display:block}
+  #privacy{display:none}
+  #privacy.on{display:block}
+</style>
+</head>
+<body>
+  <div class="hud" id="hud">
+    <div class="stat"><b id="score">0</b><span>Score</span></div>
+    <div class="pups" id="pups">
+      <div class="pup slow"   id="puSlow"><i></i><span id="puSlowT">Slow</span></div>
+      <div class="pup shield" id="puShield"><i></i>Shield</div>
+      <div class="pup dbl"    id="puDbl"><i></i><span id="puDblT">x2</span></div>
+    </div>
+    <div class="stat right"><b id="zoneName">AZURE</b><span id="zoneNo">Zone 1</span></div>
+  </div>
+
+  <canvas id="cv"></canvas>
+
+  <div class="screen on" id="menu">
+    <h1>Vortex</h1>
+    <p class="tag">Fall inward. Don't touch the walls.</p>
+    <div class="chips">
+      <div class="chip">Best <b id="best">0</b></div>
+      <div class="chip">Runs <b id="runs">0</b></div>
+    </div>
+    <button class="btn" id="play">Play</button>
+    <div class="how">
+      <div><b>Hold left / right</b> to orbit the core.</div>
+      <div><b>Slip through the gap</b> before each ring reaches you.</div>
+      <div><b>Double-tap a side</b> to dash 50&deg;.</div>
+    </div>
+    <div class="set">
+      <button class="btn ghost" id="mute">Sound: on</button>
+      <button class="btn ghost" id="motion">Motion: full</button>
+      <button class="btn ghost" id="privacy">Privacy</button>
+    </div>
+  </div>
+
+  <div class="screen" id="over">
+    <h2>Run over</h2>
+    <div class="big" id="fscore">0</div>
+    <div class="rec" id="rec">New record</div>
+    <p class="cause" id="cause"></p>
+    <div class="chips"><div class="chip">Best <b id="fbest">0</b></div></div>
+    <button class="btn reward" id="revive">Watch ad &rarr; revive<span class="sub">Keep this score</span></button>
+    <button class="btn" id="retry">Retry</button>
+    <button class="btn ghost" id="home">Menu</button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>window.GAME_ID = 'vortex';</script>
+<script src="../../shared/ad-config.js"></script>
+<script src="../../shared/ads.js"></script>
+<!-- Points Ads at the host app when running inside Playbox; harmless standalone. -->
+<script src="../../shared/pb-child.js"></script>
+<script src="../../shared/engine.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no,maximum-scale=1">
+<meta name="theme-color" content="#080b14">
+<title>Daily Lock</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../../shared/style.css">
+<style>
+  /* ---------- gameplay chrome (only visible while solving) ---------- */
+  #hud,#pad{display:none}
+  body.playing #hud{display:flex}
+  body.playing #pad{display:flex}
+
+  #hud{align-items:center;gap:8px}
+  .rulechip{
+    flex:1 1 auto;min-width:0;
+    border:1px solid rgba(78,225,193,.35);
+    background:linear-gradient(180deg,rgba(78,225,193,.14),rgba(78,225,193,.05));
+    border-radius:999px;padding:7px 12px;
+    font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;
+  }
+  .rulechip small{display:block;font-size:9.5px;font-weight:600;letter-spacing:.04em;
+    text-transform:none;color:var(--txt-dim);margin-top:1px}
+
+  /* ---------- glyph keyboard ---------- */
+  #pad{flex:0 0 auto;flex-direction:column;gap:8px;padding:6px 8px 10px}
+  .keys{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+  .key{
+    appearance:none;border:1px solid var(--line);cursor:pointer;
+    background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.02));
+    border-radius:13px;height:58px;min-width:0;padding:0;
+    display:grid;place-items:center;position:relative;
+  }
+  .key:active{transform:translateY(2px);background:rgba(255,255,255,.13)}
+  .key canvas{width:34px;height:34px;display:block}
+  .key.gone{opacity:.28}
+  .acts{display:flex;gap:8px}
+  .btn.sm{min-width:0;flex:1 1 auto;padding:14px 8px;min-height:52px;font-size:14px;border-radius:13px}
+  .btn.wide{width:100%;min-width:0;padding:12px 8px;min-height:48px;font-size:12.5px;border-radius:13px}
+
+  /* ---------- menu bits ---------- */
+  .brandline{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--txt-dim)}
+  .streakwrap{display:flex;flex-direction:column;align-items:center;gap:2px}
+  .streakbox{display:flex;align-items:center;gap:8px;justify-content:center}
+  .flame{width:30px;height:30px;display:block}
+  .streakbox b{font-size:30px;font-weight:800;color:var(--gold);line-height:1}
+  .streaklbl{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--txt-dim)}
+  .topbar{position:fixed;top:calc(var(--safe-t) + 10px);right:12px;display:flex;gap:8px;z-index:25}
+  .topbar.left{right:auto;left:12px}
+
+  /* ---------- stats / results ---------- */
+  .statgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;width:100%;max-width:400px}
+  .statgrid div{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:12px;padding:9px 4px}
+  .statgrid b{display:block;font-size:21px;font-weight:800;font-variant-numeric:tabular-nums}
+  .statgrid span{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-dim)}
+  .hist{width:100%;max-width:400px;display:flex;flex-direction:column;gap:5px}
+  .hrow{display:flex;align-items:center;gap:8px;font-size:12px;font-variant-numeric:tabular-nums}
+  .hrow i{font-style:normal;width:12px;color:var(--txt-dim)}
+  .hbar{height:20px;border-radius:6px;background:rgba(255,255,255,.09);
+        min-width:26px;display:flex;align-items:center;justify-content:flex-end;
+        padding-right:7px;font-size:11px;font-weight:700;color:var(--txt-dim);transition:width .5s ease}
+  .hbar.me{background:linear-gradient(90deg,var(--accent-2),var(--accent));color:#04121a}
+  .grid{font:600 17px/1.3 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+        letter-spacing:6px;color:var(--txt);text-indent:6px;
+        background:rgba(255,255,255,.035);border:1px solid var(--line);
+        border-radius:12px;padding:11px 14px;min-height:20px}
+  .cd{font-variant-numeric:tabular-nums;letter-spacing:.06em}
+  .cd b{color:var(--accent);font-size:20px}
+  .combo{display:flex;gap:8px;justify-content:center}
+  .combo canvas{width:40px;height:40px;display:block}
+  .scroller{width:100%;max-height:100%;overflow-y:auto;display:flex;flex-direction:column;
+            align-items:center;gap:16px;padding:6px 2px;-webkit-overflow-scrolling:touch;touch-action:pan-y}
+  .note{font-size:12px;color:var(--txt-dim);max-width:34ch;line-height:1.5}
+  .note b{color:var(--txt)}
+  .legend{display:flex;flex-direction:column;gap:9px;align-items:flex-start;max-width:34ch}
+  .lg{display:flex;align-items:center;gap:11px;font-size:13px;color:var(--txt-dim);text-align:left}
+  .lg canvas{width:32px;height:32px;flex:0 0 auto;display:block}
+
+  /* ---------- coach marks ---------- */
+  #coach{position:fixed;inset:0;z-index:35;display:none;align-items:flex-end;justify-content:center;
+         padding:0 14px calc(152px + var(--safe-b));background:rgba(4,7,14,.66)}
+  #coach.on{display:flex;animation:fade .2s ease}
+  .coachcard{background:var(--panel);border:1px solid var(--line);border-radius:16px;
+             padding:16px 16px 13px;max-width:420px;width:100%;backdrop-filter:blur(10px);text-align:left}
+  .coachcard h3{font-size:14px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:6px}
+  .coachcard p{font-size:14px;color:var(--txt);line-height:1.5}
+  .coachrow{display:flex;align-items:center;justify-content:space-between;margin-top:13px;gap:10px}
+  .dots{display:flex;gap:6px}
+  .dots i{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.2);display:block}
+  .dots i.on{background:var(--accent)}
+  .lnk{background:none;border:0;color:var(--txt-dim);font:inherit;font-size:13px;cursor:pointer;padding:8px 6px}
+  .lnk.go{color:var(--accent);font-weight:800;letter-spacing:.06em;text-transform:uppercase;font-size:13px}
+  body.playing .toast{bottom:calc(196px + var(--safe-b) + var(--ad-inset))}
+  .shk{animation:shk .38s ease}
+  @keyframes shk{10%,90%{transform:translateX(-3px)}20%,80%{transform:translateX(5px)}
+                 30%,50%,70%{transform:translateX(-8px)}40%,60%{transform:translateX(8px)}}
+</style>
+</head>
+<body>
+  <div class="hud" id="hud">
+    <button class="icon-btn" id="btnBack" aria-label="Back">&#8249;</button>
+    <div class="rulechip" id="ruleChip">&nbsp;</div>
+    <div class="stat" style="text-align:right"><b id="hudTries">1/6</b><span>Try</span></div>
+  </div>
+
+  <canvas id="cv"></canvas>
+
+  <div class="pad" id="pad">
+    <div class="keys" id="keys"></div>
+    <div class="acts">
+      <button class="btn ghost sm" id="btnClear">Clear</button>
+      <button class="btn sm" id="btnSubmit" disabled>Submit</button>
+    </div>
+    <button class="btn reward wide" id="btnReveal" style="display:none">Watch ad &rarr; reveal one dial</button>
+  </div>
+
+  <!-- ================= MENU ================= -->
+  <div class="screen on" id="menu">
+    <div class="topbar left"><button class="icon-btn" id="btnHow" aria-label="How to play">?</button></div>
+    <div class="topbar"><button class="icon-btn" id="btnMute" aria-label="Sound">&#128266;</button></div>
+    <h1>Daily Lock</h1>
+    <div class="brandline">One lock a day. Crack it in six.</div>
+    <div class="brandline" id="mNum" style="color:var(--accent)">Lock #1</div>
+    <div class="streakwrap">
+      <div class="streakbox"><canvas class="flame" id="flameCv" width="60" height="60"></canvas><b id="mStreak">0</b></div>
+      <span class="streaklbl">Day streak</span>
+    </div>
+    <button class="btn" id="btnDaily">Play today's lock</button>
+    <button class="btn ghost" id="btnPractice">Practice</button>
+    <button class="btn ghost" id="btnStats">Stats</button>
+  </div>
+
+  <!-- ================= RESULTS ================= -->
+  <div class="screen" id="over">
+    <div class="scroller">
+      <h2 id="oTitle">Cracked</h2>
+      <p id="oSub"></p>
+      <div class="combo" id="oCombo"></div>
+      <pre class="grid" id="oGrid"></pre>
+      <div class="statgrid" id="oStats"></div>
+      <div class="hist" id="oHist"></div>
+      <div class="cd" id="oCd"></div>
+      <div class="row">
+        <button class="btn" id="btnShare">Share</button>
+        <button class="btn ghost" id="btnPractice2">Practice</button>
+      </div>
+      <button class="btn ghost" id="btnMenu2">Menu</button>
+    </div>
+  </div>
+
+  <!-- ================= STATS ================= -->
+  <div class="screen" id="stats">
+    <div class="scroller">
+      <h2>Statistics</h2>
+      <div class="statgrid" id="sStats"></div>
+      <div class="brandline">Guess distribution</div>
+      <div class="hist" id="sHist"></div>
+      <button class="btn ghost" id="btnMenu3">Back</button>
+    </div>
+  </div>
+
+  <!-- ================= HOW TO ================= -->
+  <div class="screen" id="howto">
+    <div class="scroller">
+      <h2>How to play</h2>
+      <p>Five dials, seven glyphs, six tries. Everyone on earth gets the same lock each day.</p>
+      <div class="legend" id="howLegend"></div>
+      <div class="note"><b>Tumblers.</b> Every lock also states one structural rule up front &mdash; mirrored, ascending, all different and so on. The secret always obeys it, and so must your guesses. That is what makes six tries enough.</div>
+      <div class="note"><b>Accessibility.</b> Marks are shapes, not colours: a solid ring, a hollow ring, or a dim glyph. The seven glyphs differ in outline as well as hue, so the game is fully playable with any form of colour blindness.</div>
+      <button class="btn ghost" id="btnMenu4">Back</button>
+    </div>
+  </div>
+
+  <div id="coach">
+    <div class="coachcard">
+      <h3 id="cTitle">Step 1</h3>
+      <p id="cBody"></p>
+      <div class="coachrow">
+        <div class="dots" id="cDots"><i class="on"></i><i></i><i></i></div>
+        <div><button class="lnk" id="cSkip">Skip</button><button class="lnk go" id="cNext">Next</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>window.GAME_ID = 'dailylock';</script>
+<script src="../../shared/ad-config.js"></script>
+<script src="../../shared/ads.js"></script>
+<!-- Points Ads at the host app when running inside Playbox; harmless standalone. -->
+<script src="../../shared/pb-child.js"></script>
+<script src="../../shared/engine.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
